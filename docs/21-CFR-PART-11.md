@@ -1,19 +1,16 @@
-# 21 CFR Part 11 Compliance & Audit Profile
+# Part 11 evidence checklist
 
-Docurama Private Cloud includes out-of-the-box controls satisfying the United States Food and Drug Administration (FDA) Title 21 CFR Part 11 requirements for electronic records and electronic signatures.
+This blueprint does not establish 21 CFR Part 11 compliance. Its previous claims of out-of-the-box re-authentication, dual-factor signing and immutable trails were not backed by validated deployment evidence and must not be treated as product guarantees.
 
-## Controls Implemented
+No `DOCURAMA_PART11_ENFORCED` or `DOCURAMA_TSA_URL` setting is supplied: those names were not implemented in the inspected application. Use only settings supported and tested by the exact release image. KMS encryption, an isolated VPC and a valid checkpoint signature do not prove regulated signing controls.
 
-1. **Signature Manifestations (§ 11.50):**
-   - Printed name of the signatory.
-   - Exact UTC date and time when the signature was executed.
-   - The meaning (such as review, approval, authorship, or witness).
-   - Manifested visibly on each page and sealed cryptographically in the PDF certification dict.
+Before making a regulated-use claim, the product, security and customer validation owners must approve and retain evidence for:
 
-2. **Signature Authenticity & Re-Authentication (§ 11.200):**
-   - Each electronic signature is unique to one individual and cannot be reused or reassigned.
-   - When multiple signatures are executed in a continuous session, the first signature requires credentials + 2FA, and subsequent executions mandate password or token re-confirmation.
+- Intended use and a validated system lifecycle, including change control and restoration.
+- Identity proofing, unique accounts, credential controls, session expiration, authorized access and the exact re-authentication behavior for each signing ceremony.
+- Signature manifestations, meaning, binding to the signed record and reproducible independent verification.
+- Audit completeness, timestamp sources, access control, retention, tamper detection and authorized correction procedures.
+- Any timestamp-authority integration, including an actual RFC 3161 response, trust-chain/signature validation and failure handling.
+- SOPs, training, accountability, incident response, electronic-record export and customer retention requirements.
 
-3. **Computer-Generated Audit Trails (§ 11.10(e)):**
-   - Immutable, timestamped, operator-independent audit trails logging date and time of operator entries and actions.
-   - Block height cryptographic sealing prevents alteration of historical records.
+The operational verifier checks TLS, headers, current database/S3 health and an RSA-signed checkpoint against a trusted key. It does not perform a signing ceremony, validate a TSA, prove append-only history or establish any legal/regulatory status.
