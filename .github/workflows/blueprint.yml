@@ -1,0 +1,36 @@
+name: Private cloud blueprint
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - name: Shell syntax
+        run: bash -n scripts/provision-tenant-vpc.sh scripts/verify-compliance.sh
+      - name: Offline bootstrap and verifier regressions
+        run: sudo python3 -m unittest discover -s tests -v
+      - name: Compose contract (no image pulls or containers)
+        env:
+          APP_IMAGE: ghcr.io/stalfe-cloud/docurama-enterprise@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          EDGE_IMAGE: nginx@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          S3_BUCKET: docurama-ci-fixture
+          S3_REGION: eu-west-3
+          S3_SSE_KMS_KEY_ID: arn:aws:kms:eu-west-3:123456789012:key/12345678-1234-1234-1234-123456789012
+        run: docker compose -f compose/docker-compose.vpc.yml config --quiet
+      - name: Terraform format
+        run: terraform -chdir=terraform fmt -check -recursive
+      - name: Terraform initialize without backend
+        run: terraform -chdir=terraform init -backend=false -input=false -lockfile=readonly
+      - name: Terraform validate
+        run: terraform -chdir=terraform validate
+      - name: Terraform mock plans (no AWS credentials or resource creation)
+        run: terraform -chdir=terraform test

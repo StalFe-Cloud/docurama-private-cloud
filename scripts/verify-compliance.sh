@@ -1,31 +1,19 @@
 #!/usr/bin/env bash
+# Operational and checkpoint checks, not a legal compliance certification.
 set -euo pipefail
-
-# Docurama Private Cloud — Compliance & Security Verification
-
-DOMAIN="${1:-sign.acme-corp.eu}"
-
-echo "=========================================================="
-echo "  Auditing Dedicated Private Cloud Enclave: ${DOMAIN}"
-echo "=========================================================="
-
-echo "[1/5] Checking TLS Protocol and Cipher Suite..."
-curl -sIv --tlsv1.2 "https://${DOMAIN}" 2>&1 | grep -E "SSL connection using|TLSv1\.[23]|subject:" || true
-
-echo "[2/5] Checking Security Headers (HSTS, nosniff, frame-options)..."
-curl -sI "https://${DOMAIN}" | grep -iE "strict-transport-security|x-content-type-options|x-frame-options" || true
-
-echo "[3/5] Verifying System Health & Storage Posture (/api/health)..."
-curl -s "https://${DOMAIN}/api/health" | head -c 300 || true
-echo ""
-
-echo "[4/5] Verifying Transparency Checkpoint (/api/transparency/checkpoint)..."
-curl -s "https://${DOMAIN}/api/transparency/checkpoint" | head -c 300 || true
-echo ""
-
-echo "[5/5] Verifying RFC 3161 Timestamping Connectivity..."
-curl -sI "http://timestamp.digicert.com" | head -n 5 || true
-
-echo "=========================================================="
-echo "  Audit Complete for ${DOMAIN}"
-echo "=========================================================="
+[[ $# == 2 ]] || { echo 'Usage: verify-compliance.sh DOMAIN TRUSTED_PORTAL_KEY_SHA256' >&2; exit 1; }
+DOMAIN="$1"; FINGERPRINT="$2"
+[[ "$DOMAIN" =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$ ]] || { echo 'Invalid domain' >&2; exit 1; }
+[[ "$FINGERPRINT" =~ ^[0-9a-f]{64}$ ]] || { echo 'Supply the portal SPKI fingerprint established over a trusted channel' >&2; exit 1; }
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+for tool in curl python3 openssl; do command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }; done
+TEMP_DIR="$(mktemp -d)"
+trap 'rm -rf -- "$TEMP_DIR"' EXIT
+# curl validates hostname and CA trust. No insecure mode, HTTP downgrade, or ignored failures.
+CURL=(curl --silent --show-error --fail --proto '=https' --tlsv1.2 --connect-timeout 10 --max-time 30 --max-filesize 1048576)
+"${CURL[@]}" -D "$TEMP_DIR/headers" -o /dev/null "https://$DOMAIN/"
+"${CURL[@]}" -o "$TEMP_DIR/health.json" "https://$DOMAIN/api/health"
+"${CURL[@]}" -o "$TEMP_DIR/checkpoint.json" "https://$DOMAIN/api/transparency/checkpoint"
+python3 "$ROOT_DIR/scripts/verify-responses.py" "$TEMP_DIR" "$FINGERPRINT"
+printf 'PASS: TLS trust, security headers, database/S3 health and pinned checkpoint signature.\n'
+printf 'Signing ceremony, timestamp authority, log consistency, backups and tenant isolation require separate acceptance evidence.\n'

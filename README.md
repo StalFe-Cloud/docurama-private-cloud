@@ -1,104 +1,97 @@
-# Docurama Private Cloud — Managed Single-Tenant VPC Blueprints
+# Docurama Private Cloud
 
-> **Docurama SAS** · 1 Rue Marguerin, 75014 Paris, France  
-> **Target Environment:** Dedicated Customer Enclaves · Regulated Enterprises · 21 CFR Part 11 · Banking, Defense & Healthcare  
-> **Cryptographic Standards:** PAdES (ETSI EN 319 142-1/-2), RFC 3161 TSA, SHA-256, RSA-2048/4096, Sigstore Rekor  
-> **Compliance Frameworks:** eIDAS (Regulation EU 910/2014), GDPR (Regulation EU 2016/679), FDA 21 CFR Part 11, NIS2
+AWS infrastructure and host-configuration blueprints for one customer application deployment. This repository is a reviewable deployment starting point. It does not establish a validated production service or regulatory certification.
 
----
+The blueprint provisions an isolated VPC, allowlisted HTTP/HTTPS ingress, an EC2 host administered with AWS Systems Manager, a persistent encrypted root volume, and a private versioned S3 document bucket. One tenant KMS key protects EBS and S3. Application IAM permissions are scoped to that bucket and key. The Compose application runs as UID/GID 10001 with SQLite on EBS and document bytes in S3.
 
-## 1. Executive Summary
+No deployment has been performed as part of this remediation. Terraform mock plans and local script tests do not validate a customer's actual AWS permissions, AMI, release image, backups or application behavior.
 
-**Docurama Private Cloud** is an enterprise infrastructure automation suite designed to provision, configure, and operate completely isolated, single-tenant instances of the Docurama e-Signature and legal evidence platform within dedicated Virtual Private Clouds (VPCs) across AWS, Google Cloud, Microsoft Azure, or on-premises OpenStack/Proxmox clusters.
+## Required release contract
 
-Unlike shared multi-tenant SaaS, Private Cloud delivers:
-1. **Physical & Logical Compute Isolation:** Dedicated virtual machines / container enclaves per tenant with zero cross-tenant resource sharing.
-2. **Customer-Managed Encryption Keys (CMEK):** Storage encryption keys generated and retained exclusively within customer Cloud KMS (AWS KMS, Google Cloud KMS, Azure Key Vault, or HashiCorp Vault).
-3. **Dedicated Corporate FQDN:** Custom corporate hostname (e.g. `https://sign.acme-corp.eu`) terminated with enterprise-issued TLS certificates.
-4. **Dedicated PKI & Qualified Timestamps (QTSA):** Private X.509 signing authorities, custom PKCS#12 hardware certificates, and enterprise-specific RFC 3161 TSA server bindings.
-5. **Regulatory 21 CFR Part 11 Enclaves:** Hardened signature manifestations (printed name, UTC timestamp, signature meaning), mandatory biometric/password re-authentication challenges, and immutable append-only audit event ledgers.
-6. **Dual Storage Architecture:** Run on high-speed NVMe block storage or connect directly to customer-owned S3 buckets (AWS S3, Ceph RGW, MinIO, or Apache-2.0 SeaweedFS) with full policy parity.
-7. **Third-Party Witnessing & Evidence Packs:** Built-in transparency log hash chains with optional Sigstore Rekor witnessing and one-click `.zip` evidence pack exports with offline verifiers (`verify.html`).
+Before deploying, obtain approved, accessible digest references for **both** the Enterprise application and nginx. No release digest is supplied or invented in this repository. The application image must include:
 
----
+- Runtime enforcement of `DOCURAMA_DEPLOYMENT_MODE=private_cloud` and `DOCURAMA_PUBLIC_REGISTRATION=false`.
+- `S3_CREDENTIALS_MODE=default` using the EC2 role, `S3_AUTO_CREATE_BUCKET=0`, and explicit `S3_SERVER_SIDE_ENCRYPTION=aws:kms` / `S3_SSE_KMS_KEY_ID` support.
+- Startup that fails on unsuccessful database initialization, without automatic acceptance of destructive schema changes.
+- The offline `bun /app/bootstrap-admin.js --empty-installation` operator command bundled in the container and its runtime dependencies. Closing public registration does not itself create an administrator.
 
-## 2. Architecture & Topology
+The application container must support the supplied UID 10001, writable paths, Bun healthcheck and SQLite schema. Validate this contract against the exact image digest before release. An older image may ignore policy settings or silently select local storage; the operational verifier rejects a local-storage fallback.
 
-```
-                  ┌─────────────────────────────────────────────────────────┐
-                  │                 Client Web / Mobile Browser             │
-                  └────────────────────────────┬────────────────────────────┘
-                                               │ TLS 1.3 (Dedicated Domain)
-                                               ▼
-     ┌─────────────────────────────────────────────────────────────────────────────┐
-     │                      Customer Dedicated Enclave / VPC                       │
-     │                                                                             │
-     │   ┌───────────────────────────────┐     ┌───────────────────────────────┐   │
-     │   │   Edge Proxy (Nginx / Caddy)  │────▶│    Docurama Enterprise Core   │   │
-     │   │   TLS Termination + Headers   │     │    Next.js 16 Standalone      │   │
-     │   └───────────────────────────────┘     └──────────────┬────────────────┘   │
-     │                                                        │                    │
-     │             ┌───────────────────────────┬──────────────┴──────┬──────────┐  │
-     │             ▼                           ▼                     ▼          │  │
-     │   ┌───────────────────┐       ┌───────────────────┐ ┌─────────────┐      │  │
-     │   │ Persistent SQLite │       │ S3 / CMEK Storage │ │ RFC 3161 TSA│      │  │
-     │   │   / PostgreSQL    │       │ Scaleway / AWS /  │ │  & Rekor    │      │  │
-     │   │  (Paris / Local)  │       │     SeaweedFS     │ │  Witnessing │      │  │
-     │   └───────────────────┘       └───────────────────┘ └─────────────┘      │  │
-     └─────────────────────────────────────────────────────────────────────────────┘
-```
+## Prepare an infrastructure plan
 
----
+Terraform >= 1.7 and < 2 is required; CI uses 1.9.8 and the committed provider lockfile. AWS credentials are needed only for the operator's real plan/deployment; CI uses mock providers.
 
-## 3. Directory Structure
-
-```
-Docurama-Private-Cloud/
-├── compose/
-│   ├── docker-compose.vpc.yml     # Hardened single-tenant compose definition
-│   ├── .env.tenant.template       # Environment configuration blueprint (CMEK, S3, TSA)
-│   └── nginx.tenant.conf          # TLS termination & reverse proxy template
-├── terraform/
-│   ├── main.tf                    # Dedicated VPC, subnets, firewall rules, compute
-│   ├── variables.tf               # Tenant parameters (CIDR, domain, region)
-│   └── outputs.tf                 # Public IP, DNS records, endpoints
-├── scripts/
-│   ├── provision-tenant-vpc.sh    # Automated end-to-end tenant bootstrap
-│   └── verify-compliance.sh       # Post-deployment validation script (health, transparency, TLS)
-└── docs/
-    ├── ARCHITECTURE.md            # Deep-dive architecture and threat model
-    └── 21-CFR-PART-11.md          # FDA Part 11 validation & audit protocol
-```
-
----
-
-## 4. Deployment Workflow
+1. Review [architecture and boundaries](docs/ARCHITECTURE.md), account ownership, region, cost, approved ingress, retention and recovery requirements.
+2. Choose an approved regional x86_64 Linux AMI with Docker Engine, Compose v2, Python 3, OpenSSL, curl, bash, util-linux and the SSM agent already installed. The blueprint does not execute network bootstrap scripts.
+3. Copy `terraform/example.tfvars` to ignored `terraform/tenant.tfvars`. Replace every placeholder, including `tenant_id`, `host_ami_id`, unique bucket name, explicit AZ and client CIDRs. Supply an existing Route 53 zone ID only if this repository should manage the DNS A record.
+4. Set up a customer-approved encrypted remote Terraform state backend with locking and restricted access before a real apply. No secrets should be passed as Terraform variables or user data.
 
 ```bash
-# 1. Provision dedicated VPC and host infrastructure
-cd terraform
-terraform init
-terraform apply -var="tenant_name=acme" -var="domain=sign.acme-corp.eu"
-
-# 2. Bootstrap the tenant container enclave
-cd ../scripts
-chmod +x provision-tenant-vpc.sh verify-compliance.sh
-./provision-tenant-vpc.sh acme sign.acme-corp.eu
-
-# 3. Verify compliance, health, and cryptographic transparency
-./verify-compliance.sh sign.acme-corp.eu
+terraform -chdir=terraform init
+terraform -chdir=terraform validate
+terraform -chdir=terraform plan -var-file=tenant.tfvars -out=tenant.tfplan
 ```
 
----
+Review the saved plan and obtain the infrastructure release decision before applying it. Applying, changing DNS, pulling images and starting containers are separate operational steps. The host, bucket and KMS key have destruction safeguards. Removing safeguards or replacing the host requires an explicit migration/retention plan.
 
-## 5. Security & Compliance Checklist
+## Prepare the provisioned host
 
-- [x] **eIDAS (Regulation EU 910/2014):** PAdES B-B to B-LTA signatures with RFC 3161 timestamps.
-- [x] **FDA 21 CFR Part 11:** Signature manifestations, dual-factor authentication, and computer-generated audit trails.
-- [x] **GDPR (Regulation EU 2016/679):** Isolated customer enclave with zero telemetry and EU data sovereignty.
-- [x] **Customer-Managed Encryption Keys (CMEK):** Object storage encryption keys controlled via customer KMS.
-- [x] **Sigstore Rekor Witnessing:** Neutral third-party log anchoring to publicly prove key authenticity.
+After an approved infrastructure deployment, connect through AWS Systems Manager (no SSH port is opened). Transfer this reviewed repository and configuration using the approved administrative channel. Registry authentication, if required, belongs in root's Docker credential helper and must be configured by the operator.
 
----
+Populate an external environment file from [the template](compose/.env.tenant.template), using `terraform output bootstrap_environment`. Replace application/nginx digests and provide the corporate SMTP relay if required. No AWS access keys are needed. Supply a trusted TLS full chain and matching private key for the portal hostname.
 
-*© 2026 Docurama SAS · 1 Rue Marguerin, 75014 Paris, France · All rights reserved.*
+Run from **any working directory** on the target Linux host:
+
+```bash
+sudo bash /path/to/docurama-private-cloud/scripts/provision-tenant-vpc.sh \
+  acme sign.acme.example /secure/acme.env /secure/fullchain.pem /secure/privkey.pem
+```
+
+This validates inputs, certificate hostname/expiry/key match, prepares `/opt/docurama-tenants/acme`, sets UID/GID 10001 on application directories, and checks Compose syntax. It does not start containers. Set `DOCURAMA_DEPLOY_ROOT` only for an intentional alternative absolute mount path.
+
+The script preserves existing `.env`, TLS and signing material. It never generates an unused self-signed signing identity. A changed or incomplete installed TLS identity fails closed. A supplied replacement environment file is ignored on reruns when the installed `.env` exists; update the installed file explicitly under change control, then rerun validation. Dotenv shell expressions and interpolation are unsupported.
+
+After release/schema checks, backup preparation and deployment approval, repeat the command with `--start`. This pulls the pinned images, starts Compose and waits for application health. Start success is not acceptance evidence. Bootstrap the initial administrator before routing users, then complete the signing and restore acceptance checks.
+
+On an initialized **empty** application database, run the application's offline operator command with `DATABASE_URL` and `DOCURAMA_BOOTSTRAP_EMAIL` set for the intended installation:
+
+```bash
+# Run inside the approved application container; this is a secret-manager placeholder.
+secret-manager-read-command | bun /app/bootstrap-admin.js --empty-installation
+```
+
+The command refuses an existing user or tenant, creates the administrator and audit event atomically, and accepts the password over protected stdin or a one-process secret-manager environment injection. Verify the bundled command is present in the chosen image. From the matching source checkout, the equivalent is `bun scripts/bootstrap-admin.ts --empty-installation` with controlled database access. Never put a password in command arguments, shell history, Git, Terraform or logs. Sign in as that administrator, create the first organization through authenticated `POST /api/workspace/settings` (`op: "org.create"`, `data: {name: "Company"}`), then issue invitations. Dedicated mode refuses subsequent organization creation. See the Enterprise application's `docs/INSTALLATION-BOOTSTRAP.md` for the full contract.
+
+For TLS renewal: validate the new pair, preserve an encrypted rollback copy, atomically install the approved files with root-only permissions, run `docker compose exec docurama-tenant-edge nginx -t`, then reload nginx. Validate the served chain/hostname externally. The script checks certificate identity/expiry; full CA trust is checked by the live verifier.
+
+## Operational verification
+
+Establish the portal public-key SPKI SHA-256 fingerprint through a trusted administrative channel and record it outside the deployment. Do not copy an unverified fingerprint from the endpoint being checked.
+
+```bash
+bash scripts/verify-compliance.sh sign.acme.example TRUSTED_64_CHARACTER_HEX_FINGERPRINT
+```
+
+Despite its historical filename, this is an **operational verifier**, not a compliance certificate. It returns nonzero on transport/TLS errors, missing headers, unhealthy database/storage, local-storage fallback, invalid/mismatched checkpoint data, stale timestamps, an untrusted public key, or a bad RSA signature. It sends no TSA request and claims no timestamp-authority validation. Concurrent transparency writes can produce a checkpoint/head mismatch; retry that probe, then investigate persistent failures.
+
+Release acceptance additionally requires:
+
+- Invitation-only registration, initial-admin provisioning, cross-tenant authorization and signing re-authentication tests against the exact release.
+- Real S3 uploads, downloads, delete/version behavior and AWS evidence that objects and EBS use the expected KMS key; deny tests for wrong encryption/key and out-of-scope access.
+- Signing/evidence-pack verification, historical transparency consistency monitoring, approved key rotation and any claimed RFC 3161 / Part 11 controls.
+- SMTP delivery, TLS renewal, monitoring/alerting and the recovery drill described in [the operations runbook](docs/OPERATIONS.md).
+
+## Offline validation
+
+```bash
+bash -n scripts/*.sh
+sudo python3 -m unittest discover -s tests -v
+terraform -chdir=terraform init -backend=false
+terraform -chdir=terraform fmt -check -recursive
+terraform -chdir=terraform validate
+terraform -chdir=terraform test
+```
+
+Regression tests mock Docker and curl, use temporary directories, and exercise ownership, repeatability, explicit startup, bad inputs/TLS, failed probes and signature tampering. Terraform tests mock AWS. CI performs these checks and Compose interpolation without starting resources.
+
+Only AWS is implemented. Compute tenancy is standard EC2 tenancy (logical separation, not a dedicated physical host). The host is a single point of failure. PostgreSQL, multi-zone failover, private-only egress and certified timestamp/signing services are outside this blueprint. See [the Part 11 evidence checklist](docs/21-CFR-PART-11.md).
