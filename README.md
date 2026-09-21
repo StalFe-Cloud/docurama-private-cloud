@@ -17,6 +17,8 @@ Before deploying, obtain approved, accessible digest references for **both** the
 
 The application container must support the supplied UID 10001, writable paths, Bun healthcheck and SQLite schema. Validate this contract against the exact image digest before release. An older image may ignore policy settings or silently select local storage; the operational verifier rejects a local-storage fallback.
 
+**Contract status (2026-09-21):** the application requirement set above is implemented and locally validated on the Enterprise edition at commit `d106c71` (upstream Docurama `quality` @ `34086af`): startup applies versioned Prisma migrations and refuses to boot when they fail — the former boot-time `prisma db push --accept-data-loss` is gone, so no destructive schema change is accepted automatically; the offline `bun /app/bootstrap-admin.js --empty-installation` operator command ships in the image; the container runs as UID 10001 with the Bun `/api/health` healthcheck and was validated by local build/boot/bootstrap checks against that source. No digest is supplied here — operators must still pin and verify their own approved image digest against this contract before deployment.
+
 ## Prepare an infrastructure plan
 
 Terraform >= 1.7 and < 2 is required; CI uses 1.9.8 and the committed provider lockfile. AWS credentials are needed only for the operator's real plan/deployment; CI uses mock providers.
