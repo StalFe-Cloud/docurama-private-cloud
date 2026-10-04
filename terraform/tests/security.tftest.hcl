@@ -3,7 +3,8 @@ mock_provider "aws" {
     defaults = { partition = "aws", dns_suffix = "amazonaws.com" }
   }
 }
-# Known ARNs make policy assertions evaluable during mock plans.
+# Override ARNs resolve during mocked apply in pinned Terraform 1.9.8.
+# The sole AWS test provider above is mocked: no AWS calls or real resources.
 override_resource {
   target = aws_s3_bucket.documents
   values = { arn = "arn:aws:s3:::docurama-blueprint-tests" }
@@ -21,7 +22,7 @@ variables {
   allowed_client_cidrs = ["192.0.2.0/24"]
 }
 run "encrypted_isolated_blueprint" {
-  command = plan
+  command = apply
   assert {
     condition = jsondecode(aws_iam_role.host.assume_role_policy) == {
       Version   = "2012-10-17"

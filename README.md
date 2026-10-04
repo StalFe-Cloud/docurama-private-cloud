@@ -4,7 +4,7 @@ AWS infrastructure and host-configuration blueprints for one customer applicatio
 
 The blueprint provisions an isolated VPC, allowlisted HTTP/HTTPS ingress, an EC2 host administered with AWS Systems Manager, a persistent encrypted root volume, and a private versioned S3 document bucket. One tenant KMS key protects EBS and S3. Application IAM permissions are scoped to that bucket and key. The Compose application runs as UID/GID 10001 with SQLite on EBS and document bytes in S3.
 
-No deployment has been performed as part of this remediation. Terraform mock plans and local script tests do not validate a customer's actual AWS permissions, AMI, release image, backups or application behavior.
+No deployment has been performed as part of this remediation. Terraform mocked resource assertions and local script tests do not validate a customer's actual AWS permissions, AMI, release image, backups or application behavior.
 
 ## Required release contract
 
@@ -94,6 +94,6 @@ terraform -chdir=terraform validate
 terraform -chdir=terraform test
 ```
 
-Regression tests mock Docker and curl, use temporary directories, and exercise ownership, repeatability, explicit startup, bad inputs/TLS, failed probes and signature tampering. Terraform tests mock AWS. CI performs these checks and Compose interpolation without starting resources.
+Regression tests mock Docker and curl, use temporary directories, and exercise ownership, repeatability, explicit startup, bad inputs/TLS, failed probes and signature tampering. Terraform tests use only a mocked AWS provider. The policy assertion run simulates an apply inside Terraform test memory because Terraform 1.9.8 leaves computed ARNs unknown during plans; the invalid-input run remains a plan. No real provider apply or AWS resource creation occurs. CI performs these checks and Compose interpolation without starting resources.
 
 Only AWS is implemented. Compute tenancy is standard EC2 tenancy (logical separation, not a dedicated physical host). The host is a single point of failure. PostgreSQL, multi-zone failover, private-only egress and certified timestamp/signing services are outside this blueprint. See [the Part 11 evidence checklist](docs/21-CFR-PART-11.md).
