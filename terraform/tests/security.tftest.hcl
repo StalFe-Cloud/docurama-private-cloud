@@ -3,15 +3,17 @@ mock_provider "aws" {
     defaults = { partition = "aws", dns_suffix = "amazonaws.com" }
   }
 }
-# Override ARNs resolve during mocked apply in pinned Terraform 1.9.8.
+# Terraform 1.11 supports plan-time ARN overrides without simulated teardown.
 # The sole AWS test provider above is mocked: no AWS calls or real resources.
 override_resource {
-  target = aws_s3_bucket.documents
-  values = { arn = "arn:aws:s3:::docurama-blueprint-tests" }
+  override_during = plan
+  target          = aws_s3_bucket.documents
+  values          = { arn = "arn:aws:s3:::docurama-blueprint-tests" }
 }
 override_resource {
-  target = aws_kms_key.tenant_cmek
-  values = { arn = "arn:aws:kms:eu-west-3:123456789012:key/12345678-1234-1234-1234-123456789012" }
+  override_during = plan
+  target          = aws_kms_key.tenant_cmek
+  values          = { arn = "arn:aws:kms:eu-west-3:123456789012:key/12345678-1234-1234-1234-123456789012" }
 }
 variables {
   tenant_id            = "test"
@@ -22,7 +24,7 @@ variables {
   allowed_client_cidrs = ["192.0.2.0/24"]
 }
 run "encrypted_isolated_blueprint" {
-  command = apply
+  command = plan
   assert {
     condition = jsondecode(aws_iam_role.host.assume_role_policy) == {
       Version   = "2012-10-17"

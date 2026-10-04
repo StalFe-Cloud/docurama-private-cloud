@@ -21,7 +21,7 @@ The application container must support the supplied UID 10001, writable paths, B
 
 ## Prepare an infrastructure plan
 
-Terraform >= 1.7 and < 2 is required; CI uses 1.9.8 and the committed provider lockfile. AWS credentials are needed only for the operator's real plan/deployment; CI uses mock providers.
+Terraform >= 1.7 and < 2 is required for the blueprint; the offline test suite requires >= 1.11 and CI pins 1.11.4 with the committed provider lockfile. AWS credentials are needed only for the operator's real plan/deployment; CI uses mock providers.
 
 1. Review [architecture and boundaries](docs/ARCHITECTURE.md), account ownership, region, cost, approved ingress, retention and recovery requirements.
 2. Choose an approved regional x86_64 Linux AMI with Docker Engine, Compose v2, Python 3, OpenSSL, curl, bash, util-linux and the SSM agent already installed. The blueprint does not execute network bootstrap scripts.
@@ -94,6 +94,6 @@ terraform -chdir=terraform validate
 terraform -chdir=terraform test
 ```
 
-Regression tests mock Docker and curl, use temporary directories, and exercise ownership, repeatability, explicit startup, bad inputs/TLS, failed probes and signature tampering. Terraform tests use only a mocked AWS provider. The policy assertion run simulates an apply inside Terraform test memory because Terraform 1.9.8 leaves computed ARNs unknown during plans; the invalid-input run remains a plan. No real provider apply or AWS resource creation occurs. CI performs these checks and Compose interpolation without starting resources.
+Regression tests mock Docker and curl, use temporary directories, and exercise ownership, repeatability, explicit startup, bad inputs/TLS, failed probes and signature tampering. Terraform tests use only a mocked AWS provider. Both test runs use plans. Terraform 1.11.4 supports plan-time ARN overrides, allowing the attached policy assertions to evaluate while production destruction safeguards remain enabled. No provider apply or AWS resource creation occurs. CI performs these checks and Compose interpolation without starting resources.
 
 Only AWS is implemented. Compute tenancy is standard EC2 tenancy (logical separation, not a dedicated physical host). The host is a single point of failure. PostgreSQL, multi-zone failover, private-only egress and certified timestamp/signing services are outside this blueprint. See [the Part 11 evidence checklist](docs/21-CFR-PART-11.md).

@@ -56,9 +56,9 @@ python3 -B -m unittest discover -s tests -p test_release.py -v
 The full `test_blueprint.py` suite requires Linux tools; ownership tests require
 root and use temporary directories plus mocked Docker/curl. Terraform mock tests
 now inspect the actual attached policy JSON instead of substituting empty policies.
-The sole test AWS provider is mocked. Terraform 1.9.8 resolves overridden computed
-ARNs only during the simulated apply, so the policy assertion run uses a mocked
-apply held in test memory; the invalid-input run remains a plan. This does not
-invoke a real AWS provider apply or create cloud resources.
+The sole test AWS provider is mocked. Both runs use plans, with Terraform 1.11.4
+plan-time ARN overrides for attached policy assertions. These tests require
+Terraform >= 1.11. Production destruction safeguards remain enabled; no provider
+apply or cloud resource creation occurs.
 They still do not evaluate live AWS authorization. Run the documented Terraform
 format/validate/mock tests with the locked provider before accepting this change.

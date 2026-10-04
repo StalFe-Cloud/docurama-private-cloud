@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
-          terraform_version: 1.9.8
+          terraform_version: 1.11.4
           terraform_wrapper: false
       - name: Shell syntax
         run: bash -n scripts/provision-tenant-vpc.sh scripts/verify-compliance.sh
