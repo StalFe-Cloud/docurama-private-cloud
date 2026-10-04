@@ -10,6 +10,8 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: file:/app/db/custom.db
+      DOCURAMA_DB_PROVIDER: sqlite
+      DOCURAMA_SKIP_MIGRATIONS: "0"
       STORAGE_DIR: /app/storage
       NEXT_PUBLIC_DEMO_MODE: "false"
       DOCURAMA_DEPLOYMENT_MODE: private_cloud

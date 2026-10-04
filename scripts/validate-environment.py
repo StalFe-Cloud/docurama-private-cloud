@@ -42,6 +42,7 @@ def validate(path, tenant, domain):
     for name in ('S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_ENDPOINT'):
         if values.get(name):
             raise ValueError(f'{name} is unsupported: use the EC2 instance role and regional AWS S3')
+    return values
 
 
 if __name__ == '__main__':

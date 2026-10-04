@@ -1,0 +1,54 @@
+{
+  "format": "docurama-private-cloud-release-v1",
+  "tenant_id": "REPLACE",
+  "domain": "REPLACE",
+  "app_image": "REPLACE_WITH_APPROVED_DIGEST",
+  "edge_image": "REPLACE_WITH_APPROVED_DIGEST",
+  "database_provider": "sqlite",
+  "application_source_commit": "REPLACE_WITH_FULL_ENTERPRISE_COMMIT",
+  "decision": "pending",
+  "approved_by": "REPLACE",
+  "approved_at": "REPLACE_WITH_APPROVAL_UTC_TIMESTAMP",
+  "checks": {
+    "runtime_contract": {
+      "status": "pending",
+      "report": "reports/runtime_contract.txt",
+      "sha256": "REPLACE_WITH_REPORT_SHA256"
+    },
+    "migration_failure": {
+      "status": "pending",
+      "report": "reports/migration_failure.txt",
+      "sha256": "REPLACE_WITH_REPORT_SHA256"
+    },
+    "admin_bootstrap": {
+      "status": "pending",
+      "report": "reports/admin_bootstrap.txt",
+      "sha256": "REPLACE_WITH_REPORT_SHA256"
+    },
+    "invitation_and_tenant_isolation": {
+      "status": "pending",
+      "report": "reports/invitation_and_tenant_isolation.txt",
+      "sha256": "REPLACE_WITH_REPORT_SHA256"
+    },
+    "s3_kms_and_access_denials": {
+      "status": "pending",
+      "report": "reports/s3_kms_and_access_denials.txt",
+      "sha256": "REPLACE_WITH_REPORT_SHA256"
+    },
+    "signing_and_evidence": {
+      "status": "pending",
+      "report": "reports/signing_and_evidence.txt",
+      "sha256": "REPLACE_WITH_REPORT_SHA256"
+    },
+    "backup_restore": {
+      "status": "pending",
+      "report": "reports/backup_restore.txt",
+      "sha256": "REPLACE_WITH_REPORT_SHA256"
+    },
+    "monitoring_and_tls": {
+      "status": "pending",
+      "report": "reports/monitoring_and_tls.txt",
+      "sha256": "REPLACE_WITH_REPORT_SHA256"
+    }
+  }
+}

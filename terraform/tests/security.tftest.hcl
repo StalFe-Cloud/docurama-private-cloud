@@ -1,10 +1,16 @@
 mock_provider "aws" {
-  mock_data "aws_iam_policy_document" {
-    defaults = { json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}" }
-  }
   mock_data "aws_partition" {
     defaults = { partition = "aws", dns_suffix = "amazonaws.com" }
   }
+}
+# Known ARNs make policy assertions evaluable during mock plans.
+override_resource {
+  target = aws_s3_bucket.documents
+  values = { arn = "arn:aws:s3:::docurama-blueprint-tests" }
+}
+override_resource {
+  target = aws_kms_key.tenant_cmek
+  values = { arn = "arn:aws:kms:eu-west-3:123456789012:key/12345678-1234-1234-1234-123456789012" }
 }
 variables {
   tenant_id            = "test"
@@ -16,6 +22,13 @@ variables {
 }
 run "encrypted_isolated_blueprint" {
   command = plan
+  assert {
+    condition = jsondecode(aws_iam_role.host.assume_role_policy) == {
+      Version   = "2012-10-17"
+      Statement = [{ Effect = "Allow", Action = ["sts:AssumeRole"], Principal = { Service = "ec2.amazonaws.com" } }]
+    }
+    error_message = "Only EC2 may assume the application host role."
+  }
   assert {
     condition     = aws_instance.host.root_block_device[0].encrypted && !aws_instance.host.root_block_device[0].delete_on_termination
     error_message = "Host data must be encrypted and survive termination."
@@ -39,6 +52,58 @@ run "encrypted_isolated_blueprint" {
   assert {
     condition     = alltrue([for rule in aws_security_group.tenant_sg.ingress : rule.from_port == 80 || rule.from_port == 443])
     error_message = "Do not open SSH or application/database ports."
+  }
+  assert {
+    condition = alltrue([for rule in aws_security_group.tenant_sg.ingress :
+      toset(rule.cidr_blocks) == toset(var.allowed_client_cidrs)
+    ])
+    error_message = "Every browser ingress rule must preserve the approved CIDR allowlist."
+  }
+  assert {
+    condition = length(jsondecode(aws_s3_bucket_policy.documents.policy).Statement) == 3 && alltrue([
+      for statement in jsondecode(aws_s3_bucket_policy.documents.policy).Statement :
+      statement.Effect == "Deny" && statement.Principal == "*" &&
+      (statement.Sid == "DenyInsecureTransport" ? (
+        statement.Action == ["s3:*"] &&
+        statement.Resource == [aws_s3_bucket.documents.arn, "${aws_s3_bucket.documents.arn}/*"] &&
+        statement.Condition == { Bool = { "aws:SecureTransport" = "false" } }
+        ) : statement.Sid == "RequireKmsEncryption" ? (
+        statement.Action == ["s3:PutObject"] && statement.Resource == ["${aws_s3_bucket.documents.arn}/*"] &&
+        statement.Condition == { StringNotEquals = { "s3:x-amz-server-side-encryption" = "aws:kms" } }
+        ) : statement.Sid == "RequireTenantKey" ? (
+        statement.Action == ["s3:PutObject"] && statement.Resource == ["${aws_s3_bucket.documents.arn}/*"] &&
+        statement.Condition == { StringNotEquals = { "s3:x-amz-server-side-encryption-aws-kms-key-id" = aws_kms_key.tenant_cmek.arn } }
+      ) : false)
+    ]) && toset([for statement in jsondecode(aws_s3_bucket_policy.documents.policy).Statement : statement.Sid]) == toset(["DenyInsecureTransport", "RequireKmsEncryption", "RequireTenantKey"])
+    error_message = "Attached bucket policy must deny insecure transport, missing/wrong SSE-KMS and missing/wrong tenant key."
+  }
+  assert {
+    condition = jsondecode(aws_iam_role_policy.app.policy) == {
+      Version = "2012-10-17"
+      Statement = [
+        { Effect = "Allow", Action = ["s3:ListBucket", "s3:GetBucketLocation"], Resource = [aws_s3_bucket.documents.arn] },
+        { Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], Resource = ["${aws_s3_bucket.documents.arn}/*"] },
+        {
+          Effect = "Allow", Action = ["kms:Decrypt", "kms:GenerateDataKey"], Resource = [aws_kms_key.tenant_cmek.arn]
+          Condition = {
+            StringEquals = { "kms:ViaService" = "s3.eu-west-3.amazonaws.com" }
+            StringLike   = { "kms:EncryptionContext:aws:s3:arn" = [aws_s3_bucket.documents.arn, "${aws_s3_bucket.documents.arn}/*"] }
+          }
+        }
+      ]
+    }
+    error_message = "Attached application policy must allow only tenant object operations and S3-scoped tenant KMS use; no bucket creation or version deletion."
+  }
+  assert {
+    condition = jsondecode(aws_vpc_endpoint.s3.policy) == {
+      Version = "2012-10-17"
+      Statement = [{
+        Effect   = "Allow", Principal = "*"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetBucketLocation"]
+        Resource = [aws_s3_bucket.documents.arn, "${aws_s3_bucket.documents.arn}/*"]
+      }]
+    }
+    error_message = "Endpoint policy must implicitly deny all operations and resources outside the tenant allowlist."
   }
 }
 run "reject_invalid_tenant" {

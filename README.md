@@ -53,7 +53,7 @@ This validates inputs, certificate hostname/expiry/key match, prepares `/opt/doc
 
 The script preserves existing `.env`, TLS and signing material. It never generates an unused self-signed signing identity. A changed or incomplete installed TLS identity fails closed. A supplied replacement environment file is ignored on reruns when the installed `.env` exists; update the installed file explicitly under change control, then rerun validation. Dotenv shell expressions and interpolation are unsupported.
 
-After release/schema checks, backup preparation and deployment approval, repeat the command with `--start`. This pulls the pinned images, starts Compose and waits for application health. Start success is not acceptance evidence. Bootstrap the initial administrator before routing users, then complete the signing and restore acceptance checks.
+After exact-image qualification, backup preparation and deployment approval, repeat the command with `--start /secure/release/release.json`. The [release evidence gate](docs/RELEASE-EVIDENCE.md) requires an approved decision bound to this installation and both digests, plus intact reports for all required acceptance checks. It validates report completeness and integrity, not their truth or approver authority. This pulls the pinned images, starts Compose and waits for application health. Start success is not acceptance evidence. Bootstrap the initial administrator before routing users, then complete customer-instance signing and recovery acceptance checks.
 
 On an initialized **empty** application database, run the application's offline operator command with `DATABASE_URL` and `DOCURAMA_BOOTSTRAP_EMAIL` set for the intended installation:
 

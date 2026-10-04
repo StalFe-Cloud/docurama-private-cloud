@@ -59,7 +59,7 @@ class BlueprintTests(unittest.TestCase):
             self.environment.write_text(invalid)
             self.assertNotEqual(run(validate).returncode, 0)
 
-    @unittest.skipUnless(os.geteuid() == 0, 'Bootstrap ownership test requires root; CI runs in sudo')
+    @unittest.skipUnless(getattr(os, 'geteuid', lambda: -1)() == 0, 'Bootstrap ownership test requires Linux root; CI runs in sudo')
     def test_bootstrap_is_repeatable_and_prepare_only(self):
         log = self.path / 'docker.log'
         executable(self.bin / 'docker', '#!/bin/sh\nprintf "%s\\n" "$*" >> ' + str(log) + '\n')
@@ -82,10 +82,40 @@ class BlueprintTests(unittest.TestCase):
         self.assertNotIn('up ', log.read_text())
         self.assertNotIn('pull', log.read_text())
         result = self.bootstrap('--start')
+        self.assertNotEqual(result.returncode, 0, 'Starting without release evidence must fail')
+        from test_release import fixture
+        release, _ = fixture(self.path, target / '.env')
+        invalid_release = self.path / 'invalid-release.json'
+        invalid_release.write_text('{}')
+        result = self.bootstrap('--start', str(invalid_release))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('pull', log.read_text(), 'Invalid evidence must fail before image pulls')
+        result = self.bootstrap('--start', str(release))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('up -d --wait', log.read_text())
 
-    @unittest.skipUnless(os.geteuid() == 0, 'Bootstrap ownership test requires root')
+    @unittest.skipUnless(getattr(os, 'geteuid', lambda: -1)() == 0, 'Bootstrap ownership test requires Linux root')
+    def test_bootstrap_revalidates_first_installed_environment_before_compose(self):
+        from test_release import fixture
+        release, _ = fixture(self.path, self.environment)
+        log = self.path / 'docker.log'
+        executable(self.bin / 'docker', '#!/bin/sh\nprintf "%s\\n" "$*" >> ' + str(log) + '\n')
+        self.env['DOCURAMA_DEPLOY_ROOT'] = str(self.path / 'deploy')
+        real_install = shutil.which('install')
+        self.assertIsNotNone(real_install)
+        # Substitute the copied .env after initial validation, without services.
+        executable(self.bin / 'install', '#!/usr/bin/env python3\n'
+                   'import pathlib, subprocess, sys\n'
+                   'subprocess.run([' + repr(real_install) + ', *sys.argv[1:]], check=True)\n'
+                   'target = pathlib.Path(sys.argv[-1])\n'
+                   "if target.name == '.env':\n"
+                   "    target.write_text(target.read_text().replace('@sha256:' + 'a' * 64, '@sha256:' + 'b' * 64))\n")
+        result = self.bootstrap('--start', str(release))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('image digest mismatch', result.stderr)
+        self.assertFalse(log.exists(), 'Changed installed digest must fail before compose config or pull')
+
+    @unittest.skipUnless(getattr(os, 'geteuid', lambda: -1)() == 0, 'Bootstrap ownership test requires Linux root')
     def test_bootstrap_fails_closed_on_missing_tls_and_bad_host(self):
         executable(self.bin / 'docker', '#!/bin/sh\nexit 0\n')
         self.env['DOCURAMA_DEPLOY_ROOT'] = str(self.path / 'deploy')
@@ -96,7 +126,7 @@ class BlueprintTests(unittest.TestCase):
         self.assertNotEqual(invalid.returncode, 0)
         self.assertFalse((self.path / 'escape').exists())
 
-    @unittest.skipUnless(os.geteuid() == 0, 'Bootstrap ownership test requires root')
+    @unittest.skipUnless(getattr(os, 'geteuid', lambda: -1)() == 0, 'Bootstrap ownership test requires Linux root')
     def test_bootstrap_rejects_wrong_certificate_hostname_and_symlink(self):
         executable(self.bin / 'docker', '#!/bin/sh\nexit 0\n')
         self.env['DOCURAMA_DEPLOY_ROOT'] = str(self.path / 'deploy')

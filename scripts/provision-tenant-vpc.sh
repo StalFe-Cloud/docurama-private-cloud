@@ -4,7 +4,7 @@ set -euo pipefail
 umask 077
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
-[[ $# -ge 5 && $# -le 6 ]] || die 'Usage: provision-tenant-vpc.sh TENANT_ID DOMAIN ENV_FILE TLS_CHAIN TLS_KEY [--start]'
+[[ $# == 5 || $# == 7 ]] || die 'Usage: provision-tenant-vpc.sh TENANT_ID DOMAIN ENV_FILE TLS_CHAIN TLS_KEY [--start RELEASE_EVIDENCE_JSON]'
 TENANT_ID="$1"; DOMAIN="$2"; ENV_FILE="$3"; TLS_CHAIN="$4"; TLS_KEY="$5"
 [[ "${6:-}" == '' || "${6:-}" == '--start' ]] || die 'Unknown option'
 [[ "$TENANT_ID" =~ ^[a-z][a-z0-9-]{1,30}$ ]] || die 'Invalid tenant identifier'
@@ -29,6 +29,9 @@ else
   CONFIG="$ENV_FILE"
 fi
 python3 "$ROOT_DIR/scripts/validate-environment.py" "$CONFIG" "$TENANT_ID" "$DOMAIN"
+if [[ "${6:-}" == '--start' ]]; then
+  python3 "$ROOT_DIR/scripts/validate-release.py" "$7" "$CONFIG" "$TENANT_ID" "$DOMAIN"
+fi
 [[ -f "$TLS_CHAIN" && -f "$TLS_KEY" ]] || die 'Supply a trusted TLS certificate chain and private key'
 openssl x509 -in "$TLS_CHAIN" -noout -checkend 86400 >/dev/null || die 'TLS certificate expires within 24 hours'
 # OpenSSL x509 returns zero even for a hostname mismatch; assert its result.
@@ -53,6 +56,11 @@ else
 fi
 chmod 600 "$DEPLOY_DIR/ssl/fullchain.pem" "$DEPLOY_DIR/ssl/privkey.pem"
 cd "$DEPLOY_DIR"
+# The installed file is authoritative: the supplied file may change before copy.
+python3 "$ROOT_DIR/scripts/validate-environment.py" "$DEPLOY_DIR/.env" "$TENANT_ID" "$DOMAIN"
+if [[ "${6:-}" == '--start' ]]; then
+  python3 "$ROOT_DIR/scripts/validate-release.py" "$7" "$DEPLOY_DIR/.env" "$TENANT_ID" "$DOMAIN"
+fi
 # Prevent caller variables from overriding the validated dotenv contract.
 compose() { env -i PATH="$PATH" HOME=/root docker compose --env-file .env -f docker-compose.yml "$@"; }
 compose config --quiet

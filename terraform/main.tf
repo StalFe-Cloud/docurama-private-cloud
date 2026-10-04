@@ -93,105 +93,24 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "documents" {
   }
 }
 
-data "aws_iam_policy_document" "bucket" {
-  statement {
-    sid       = "DenyInsecureTransport"
-    effect    = "Deny"
-    actions   = ["s3:*"]
-    resources = [aws_s3_bucket.documents.arn, "${aws_s3_bucket.documents.arn}/*"]
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-    condition {
-      test     = "Bool"
-      variable = "aws:SecureTransport"
-      values   = ["false"]
-    }
-  }
-  # Require explicit SSE-KMS headers: default encryption alone permits overrides.
-  statement {
-    sid       = "RequireKmsEncryption"
-    effect    = "Deny"
-    actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.documents.arn}/*"]
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-    condition {
-      test     = "StringNotEquals"
-      variable = "s3:x-amz-server-side-encryption"
-      values   = ["aws:kms"]
-    }
-  }
-  statement {
-    sid       = "RequireTenantKey"
-    effect    = "Deny"
-    actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.documents.arn}/*"]
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-    condition {
-      test     = "StringNotEquals"
-      variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
-      values   = [aws_kms_key.tenant_cmek.arn]
-    }
-  }
-}
 resource "aws_s3_bucket_policy" "documents" {
   bucket     = aws_s3_bucket.documents.id
-  policy     = data.aws_iam_policy_document.bucket.json
+  policy     = jsonencode(local.bucket_policy)
   depends_on = [aws_s3_bucket_public_access_block.documents]
 }
 
-data "aws_iam_policy_document" "assume_host" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ec2.amazonaws.com"]
-    }
-  }
-}
 resource "aws_iam_role" "host" {
   name               = "${local.name}-host"
-  assume_role_policy = data.aws_iam_policy_document.assume_host.json
+  assume_role_policy = jsonencode(local.host_trust_policy)
 }
 resource "aws_iam_instance_profile" "host" {
   name = "${local.name}-host"
   role = aws_iam_role.host.name
 }
-data "aws_iam_policy_document" "app" {
-  statement {
-    actions   = ["s3:ListBucket", "s3:GetBucketLocation"]
-    resources = [aws_s3_bucket.documents.arn]
-  }
-  statement {
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-    resources = ["${aws_s3_bucket.documents.arn}/*"]
-  }
-  statement {
-    actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
-    resources = [aws_kms_key.tenant_cmek.arn]
-    condition {
-      test     = "StringEquals"
-      variable = "kms:ViaService"
-      values   = ["s3.${var.aws_region}.${data.aws_partition.current.dns_suffix}"]
-    }
-    condition {
-      test     = "StringLike"
-      variable = "kms:EncryptionContext:aws:s3:arn"
-      values   = [aws_s3_bucket.documents.arn, "${aws_s3_bucket.documents.arn}/*"]
-    }
-  }
-}
 resource "aws_iam_role_policy" "app" {
   name   = "tenant-documents"
   role   = aws_iam_role.host.id
-  policy = data.aws_iam_policy_document.app.json
+  policy = jsonencode(local.application_policy)
 }
 resource "aws_iam_role_policy_attachment" "ssm" {
   role       = aws_iam_role.host.name
@@ -240,15 +159,7 @@ resource "aws_vpc_endpoint" "s3" {
   service_name      = "com.amazonaws.${var.aws_region}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [aws_route_table.public.id]
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = "*"
-      Action    = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetBucketLocation"]
-      Resource  = [aws_s3_bucket.documents.arn, "${aws_s3_bucket.documents.arn}/*"]
-    }]
-  })
+  policy            = jsonencode(local.endpoint_policy)
 }
 
 # Use an explicitly approved, pre-baked AMI. There is no download-and-execute user data.
