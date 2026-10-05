@@ -5,9 +5,25 @@ import sys
 from pathlib import Path
 
 
+def validate_mail_sender(value):
+    """Blank inherits platform identity; nonblank must be one safe mailbox."""
+    if not value.strip():
+        return
+    if len(value) > 500 or re.search(r'[\x00-\x1f\x7f]', value):
+        raise ValueError('SMTP_FROM must contain one valid configured sender')
+    value = value.strip()
+    named = re.fullmatch(r'([^<>]+)\s*<([^<>]+)>', value)
+    address = (named[2] if named else value).strip()
+    local, separator, domain = address.rpartition('@')
+    if (not separator or len(address) > 254 or not 1 <= len(local) <= 64
+            or not re.fullmatch(r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*", local)
+            or not re.fullmatch(r'(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?', domain)):
+        raise ValueError('SMTP_FROM must contain exactly one valid mailbox')
+
+
 def validate(path, tenant, domain):
     values = {}
-    for line in Path(path).read_text().splitlines():
+    for line in Path(path).read_text(encoding='utf-8').splitlines():
         line = line.strip()
         if not line or line.startswith('#'):
             continue
@@ -42,6 +58,7 @@ def validate(path, tenant, domain):
     for name in ('S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_ENDPOINT'):
         if values.get(name):
             raise ValueError(f'{name} is unsupported: use the EC2 instance role and regional AWS S3')
+    validate_mail_sender(values.get('SMTP_FROM', ''))
     return values
 
 

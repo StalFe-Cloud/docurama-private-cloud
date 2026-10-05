@@ -62,3 +62,7 @@ Terraform >= 1.11. Production destruction safeguards remain enabled; no provider
 apply or cloud resource creation occurs.
 They still do not evaluate live AWS authorization. Run the documented Terraform
 format/validate/mock tests with the locked provider before accepting this change.
+
+## Evidence lineage and pending qualification
+
+The prior Private Cloud engineering checkpoint is `779b8d5dc2485fd3c5e61e99d195ea7432c2a846`; the prior Enterprise all-green checkpoint is `25ae19c50e26a423e9d2386e3c76ecaf713c71f3`. Their CI evidence is source-specific and must not be attributed to later edits or substituted for an approved image digest. Requalify the new source and exact SQLite application/nginx digests, retain the full application source commit and all eight report categories above, and obtain the installation release decision before `--start`. Do not prefill pending reports as passed from mocked IAM or synthetic SeaweedFS evidence.

@@ -24,6 +24,8 @@ services:
       S3_SSE_KMS_KEY_ID: ${S3_SSE_KMS_KEY_ID:?Supply Terraform KMS key ARN}
       REKOR_WITNESS: "off"
       SMTP_URL: ${SMTP_URL:-}
+      # Blank preserves platform sender inheritance or outbox-only operation.
+      SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - ./data/db:/app/db
       - ./data/storage:/app/storage
