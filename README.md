@@ -1,6 +1,12 @@
 # Docurama Private Cloud
 
-AWS infrastructure and host-configuration blueprints for one customer application deployment. This repository is a reviewable deployment starting point. It does not establish a validated production service or regulatory certification.
+AWS infrastructure and host-configuration blueprints for dedicated customer application deployment.
+
+* **Repository:** [https://github.com/StalFe-Cloud/docurama-private-cloud](https://github.com/StalFe-Cloud/docurama-private-cloud)
+* **Part of the [StalFe Cloud](https://github.com/StalFe-Cloud) Ecosystem:**
+  * [Docurama Cloud (SaaS)](https://github.com/StalFe-Cloud/docurama) — Public cloud multi-tenant platform.
+  * [Docurama Enterprise](https://github.com/StalFe-Cloud/docurama-enterprise) — Sovereign on-premises and self-hosted edition.
+  * [Docurama Private Cloud](https://github.com/StalFe-Cloud/docurama-private-cloud) — Dedicated AWS tenant VPC infrastructure blueprints.
 
 The blueprint provisions an isolated VPC, allowlisted HTTP/HTTPS ingress, an EC2 host administered with AWS Systems Manager, a persistent encrypted root volume, and a private versioned S3 document bucket. One tenant KMS key protects EBS and S3. Application IAM permissions are scoped to that bucket and key. The Compose application runs as UID/GID 10001 with SQLite on EBS and document bytes in S3.
 
