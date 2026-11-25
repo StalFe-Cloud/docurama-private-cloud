@@ -3,6 +3,7 @@
 AWS infrastructure and host-configuration blueprints for dedicated customer application deployment.
 
 * **Repository:** [https://github.com/StalFe-Cloud/docurama-private-cloud](https://github.com/StalFe-Cloud/docurama-private-cloud)
+* **Corporate Entity & Manufacturer:** Docurama is a flagship product engineered and operated by **VOIRIA** (**VOIRIA SASU** · 1 Rue Marguerin, 75014 Paris, France · SIREN 131 914 012 · R.C.S. Paris · TVA FR90131914012).
 * **Part of the [StalFe Cloud](https://github.com/StalFe-Cloud) Ecosystem:**
   * [Docurama Cloud (SaaS)](https://github.com/StalFe-Cloud/docurama) — Public cloud multi-tenant platform.
   * [Docurama Enterprise](https://github.com/StalFe-Cloud/docurama-enterprise) — Sovereign on-premises and self-hosted edition.
@@ -103,3 +104,7 @@ terraform -chdir=terraform test
 Regression tests mock Docker and curl, use temporary directories, and exercise ownership, repeatability, explicit startup, bad inputs/TLS, failed probes and signature tampering. Terraform tests use only a mocked AWS provider. Both test runs use plans. Terraform 1.11.4 supports plan-time ARN overrides, allowing the attached policy assertions to evaluate while production destruction safeguards remain enabled. No provider apply or AWS resource creation occurs. CI performs these checks and Compose interpolation without starting resources.
 
 Only AWS is implemented. Compute tenancy is standard EC2 tenancy (logical separation, not a dedicated physical host). The host is a single point of failure. PostgreSQL, multi-zone failover, private-only egress and certified timestamp/signing services are outside this blueprint. See [the Part 11 evidence checklist](docs/21-CFR-PART-11.md).
+
+---
+
+*© 2026 VOIRIA SASU (Docurama is a product of VOIRIA) · 1 Rue Marguerin, 75014 Paris, France · SIREN 131 914 012 · All rights reserved.*
