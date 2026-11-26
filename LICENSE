@@ -1,0 +1,37 @@
+                    Business Source License 1.1
+
+Licensor:  VOIRIA SASU (SIREN 131 914 012 · R.C.S. Paris)
+           1 Rue Marguerin, 75014 Paris, France
+
+Licensed Work:  Docurama Private Cloud — Dedicated AWS Tenant VPC
+                Infrastructure Blueprints.
+                The Licensed Work is © 2024–2026 VOIRIA SASU.
+
+Additional Use Grant:
+  You may use the Licensed Work for internal evaluation, development,
+  testing, and non-production purposes without limitation. Production
+  use — defined as any deployment that provisions real AWS infrastructure
+  for real customer data — requires a commercial license from VOIRIA SASU.
+  Contact: legal@voiria.com
+
+Change Date:  2030-01-01
+
+Change License:  Apache License, Version 2.0
+
+For information about alternative licensing arrangements for the Licensed
+Work, please contact legal@voiria.com.
+
+Notice
+
+Business Source License 1.1 (BUSL-1.1) is not an Open Source license.
+However, the Licensed Work will eventually be made available under an
+Open Source license, as stated in this License.
+
+License text: https://mariadb.com/bsl11/
+
+---
+
+THE LICENSED WORK IS PROVIDED "AS IS". VOIRIA SASU HEREBY DISCLAIMS ALL
+WARRANTIES, EXPRESS OR IMPLIED, INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NON-INFRINGEMENT.
